@@ -1,0 +1,22 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+
+# Virtual environment (if created separately)
+venv/
+
+# Poetry lock file
+poetry.lock
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Pytest cache
+.pytest_cache/
+
+# IDE/project files
+.vscode/
+.idea/
+*.swp

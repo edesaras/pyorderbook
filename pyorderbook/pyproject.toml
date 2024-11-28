@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "pyorderbook"
+version = "0.0.1"
+description = "Library for managing order books and implementing execution strategies like TWAP and VWAP"
+authors = ["Aras Edeş <edesaras@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+sortedcontainers = "^2.4.0"  # For order book management
+requests = "^2.28.0"         # For Binance REST API
+websockets = "^11.0.0"       # For Binance WebSocket API
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2"             # For testing
+black = "^23.1.0"           # Code formatting
+pre-commit = "^2.20.0"      # Pre-commit hooks
+sphinx = "^5.0.0"           # Documentation generation
+sphinx_rtd_theme = "^1.0.0" # Documentation theme
+python-dotenv = "^0.19.2"   # For environment variable management
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
