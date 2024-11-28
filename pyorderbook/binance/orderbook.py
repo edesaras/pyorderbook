@@ -1,12 +1,13 @@
 import asyncio
+import aiohttp
 import websockets
 import json
 from sortedcontainers import SortedDict
 
 
 class BinanceOrderBook:
-    def __init__(self, symbol: str, depth_limit: int = 10000):
-        self.symbol = symbol.lower()
+    def __init__(self, symbol: str, depth_limit: int = 1000):
+        self.symbol = symbol.strip().upper()  # Ensure uppercase and no extra spaces
         self.depth_limit = depth_limit
         self.bids = SortedDict(lambda x: -x)
         self.asks = SortedDict()
@@ -23,10 +24,14 @@ class BinanceOrderBook:
         """
         Fetch the initial order book snapshot from Binance REST API.
         """
-        url = f"https://api.binance.com/api/v3/depth?symbol={self.symbol.upper()}&limit={self.depth_limit}"
-        async with websockets.connect(url) as response:
-            data = json.loads(await response.read())
-            self._apply_snapshot(data)
+        url = f"https://api.binance.com/api/v3/depth?symbol={self.symbol}&limit={self.depth_limit}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    self._apply_snapshot(data)
+                else:
+                    raise Exception(f"Failed to fetch snapshot: {response.status}, {await response.text()}")
 
     def _apply_snapshot(self, snapshot: dict):
         """
@@ -44,20 +49,34 @@ class BinanceOrderBook:
         """
         Listen to Binance WebSocket for real-time updates.
         """
-        url = f"wss://stream.binance.com:9443/ws/{self.symbol}@depth"
+        url = f"wss://stream.binance.com:9443/ws/{self.symbol.lower()}@depth@100ms"
         async with websockets.connect(url) as websocket:
             while True:
-                message = json.loads(await websocket.recv())
-                self._process_update(message)
+                try:
+                    message = await websocket.recv()
+                    updates = json.loads(message)
+                    self._process_update(updates)
+                except Exception as e:
+                    print(f"WebSocket error: {e}")
+
 
     def _process_update(self, updates: dict):
         """
         Process incremental updates and notify listeners.
         """
-        if updates["u"] <= self.last_update_id:
-            return  # Ignore outdated updates
+        # print(f"Processing update: U={updates['U']}, u={updates['u']}, last_update_id={self.last_update_id}")
 
-        # Update bids
+        # Check for gaps
+        if updates["U"] > self.last_update_id + 1:
+            # print("Gap detected. Re-syncing.")
+            asyncio.create_task(self.fetch_snapshot())
+            return
+
+        if updates["u"] <= self.last_update_id:
+            # print("Outdated update. Ignored.")
+            return
+
+        # Apply updates
         for price, quantity in updates["b"]:
             price = float(price)
             quantity = float(quantity)
@@ -66,7 +85,6 @@ class BinanceOrderBook:
             else:
                 self.bids[price] = quantity
 
-        # Update asks
         for price, quantity in updates["a"]:
             price = float(price)
             quantity = float(quantity)
@@ -74,6 +92,14 @@ class BinanceOrderBook:
                 self.asks.pop(price, None)
             else:
                 self.asks[price] = quantity
+
+        self.last_update_id = updates["u"]
+
+        # Validate spread
+        best_bid, best_ask = self.get_top_of_book()
+        if best_bid and best_ask and best_bid[0] >= best_ask[0]:
+            # print(f"Negative spread detected: {best_bid}, {best_ask}. Re-syncing.")
+            asyncio.create_task(self.fetch_snapshot())
 
         # Notify listeners
         for callback in self.listeners:
@@ -101,4 +127,5 @@ class BinanceOrderBook:
         Start the order book: fetch snapshot and listen for updates.
         """
         await self.fetch_snapshot()
+        # print(len(self.bids), len(self.asks)) # debug call
         await self.listen_for_updates()

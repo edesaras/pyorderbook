@@ -11,6 +11,11 @@ python = "^3.10"
 sortedcontainers = "^2.4.0"  # For order book management
 requests = "^2.28.0"         # For Binance REST API
 websockets = "^11.0.0"       # For Binance WebSocket API
+matplotlib = "^3.9.2"
+seaborn = "^0.13.2"
+aiohttp = "^3.11.8"
+windows-curses = "^2.4.0"
+rich = "^13.9.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2"             # For testing
